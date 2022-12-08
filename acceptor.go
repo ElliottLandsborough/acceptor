@@ -41,20 +41,22 @@ func main() {
 
 	log.Printf("spawning tcp servers in range from %d til %d", fromPort, tilPort)
 
-	toListen := make([]net.Listener, tilPort-fromPort+1)
+	var toListen []net.Listener
 
 	for i := 0; fromPort <= tilPort; i, fromPort = i+1, fromPort+1 {
 		addr := ":" + strconv.FormatInt(int64(fromPort), 10)
 		log.Printf("trying to bind %s", addr)
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			log.Printf("can't create the {%d}th of port listener: %+v", i, err)
+			log.Printf("can't create listener number {%d} - %+v", i, err)
 			if die == true {
 				goto toDie
 			}
+
+			continue
 		}
 
-		toListen[i] = l
+		toListen = append(toListen, l)
 	}
 
 	for {
