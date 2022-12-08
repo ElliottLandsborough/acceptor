@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-func main() {
+func main2() {
 	fromPortFlag := flag.Int("from", 1024, "From port")
 	tilPortFlag := flag.Int("until", 2048, "Until port")
 	dieFlag := flag.Bool("die", true, "Die when port cannot be opened")
