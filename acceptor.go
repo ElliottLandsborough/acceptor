@@ -12,11 +12,11 @@ func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 
 	if _, err := c.Write([]byte(string("ok"))); err != nil {
-		fmt.Printf("couldn't write into the conn: %+v", err)
+		fmt.Printf("couldn't write into the conn: %+v\n", err)
 	}
 
 	if err := c.Close(); err != nil {
-		fmt.Printf("couldn't close the conn: %+v", err)
+		fmt.Printf("couldn't close the conn: %+v\n", err)
 		return
 	}
 }
