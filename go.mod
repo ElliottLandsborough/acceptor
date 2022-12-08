@@ -1,3 +1,3 @@
-module github.com/arpanetus/acceptor
+module github.com/elliottlandsborough/acceptor
 
-go 1.17
+go 1.19
