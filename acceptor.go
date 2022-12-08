@@ -5,10 +5,24 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
+var quit = make(chan struct{})
+
 func main() {
+	fromPort, toPort, die := processFlags()
+	listeners := createHttpListeners(fromPort, toPort, die)
+	startHttpServers(listeners)
+	handlePosix(listeners)
+}
+
+// Process the flags on load
+func processFlags() (int64, int64, bool) {
 	fromPortFlag := flag.Int("from", 1024, "From port")
 	tilPortFlag := flag.Int("until", 2048, "Until port")
 	dieFlag := flag.Bool("die", true, "Die when port cannot be opened")
@@ -26,62 +40,93 @@ func main() {
 		log.Panicf("Until port must be between 1 and 65535")
 	}
 
-	log.Printf("spawning tcp servers in range from %d til %d", fromPort, tilPort)
+	return int64(fromPort), int64(tilPort), die
+}
 
-	toListen := make([]net.Listener, tilPort-fromPort+1)
+// Builds a slice of http listeners
+func createHttpListeners(fromPort int64, toPort int64, die bool) []net.Listener {
+	listeners := make([]net.Listener, toPort-fromPort+1)
 
-	for i := 0; fromPort <= tilPort; i, fromPort = i+1, fromPort+1 {
-		addr := ":" + strconv.FormatInt(int64(fromPort), 10)
+	for listenPort := fromPort; listenPort <= toPort; listenPort++ {
+		addr := ":" + strconv.FormatInt(int64(listenPort), 10)
 		log.Printf("trying to bind %s", addr)
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
-			log.Printf("can't create listener number {%d} - %+v", i, err)
+			log.Printf("can't create listener number {%d} - %+v", listenPort, err)
 			if die == true {
-				closeListeners(toListen)
-				return
+				os.Exit(1)
 			}
 
 			continue
 		}
 
-		toListen = append(toListen, l)
+		listeners = append(listeners, l)
 	}
 
-	startListenerRoutines(toListen)
+	return listeners
 }
 
-func closeListeners(toListen []net.Listener) {
-	for _, l := range toListen {
+// Starts http servers inside goroutines based on listeners
+func startHttpServers(listeners []net.Listener) {
+	http.HandleFunc("/", content)
+	for _, l := range listeners {
+		if l != nil {
+			go http.Serve(l, nil)
+		}
+	}
+}
+
+// Serves a basic html page
+func content(w http.ResponseWriter, req *http.Request) {
+	fmt.Fprintln(w, "<!doctype html>")
+	fmt.Fprintln(w, "<html lang=en>")
+	fmt.Fprintln(w, "<head>")
+	fmt.Fprintln(w, "<meta charset=utf-8>")
+	fmt.Fprintln(w, "</head>")
+	fmt.Fprintln(w, "<body>")
+	fmt.Fprintf(w, "<p>Successful connection to `%v`</p>\n", req.Host)
+	fmt.Fprintln(w, "<p>Headers:</p>")
+	fmt.Fprintln(w, "<pre>")
+
+	for name, headers := range req.Header {
+		for _, h := range headers {
+			fmt.Fprintf(w, "%v: %v\n", name, h)
+		}
+	}
+
+	fmt.Fprintf(w, "</pre>")
+
+	fmt.Fprintf(w, "</body>")
+	fmt.Fprintf(w, "</html>")
+}
+
+// Close the listeners
+func closeListeners(listeners []net.Listener) {
+	log.Printf("closing listeners...")
+	for _, l := range listeners {
 		if l != nil {
 			if err := l.Close(); err != nil {
-				fmt.Printf("can't close the listener:%+v", err)
+				log.Printf("can't close the listener:%+v", err)
 			}
 		}
 	}
 }
 
-func startListenerRoutines(toListen []net.Listener) {
-	for _, l := range toListen {
-		if l != nil {
-			c, err := l.Accept()
-			if err != nil {
-				fmt.Printf("can't accept the conn:%+v", err)
-				return
-			}
-			go handleConnection(c)
-		}
-	}
-}
+// https://gobyexample.com/signals
+func handlePosix(listeners []net.Listener) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
 
-func handleConnection(c net.Conn) {
-	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
+	go func() {
+		sig := <-sigs
+		fmt.Println()
+		fmt.Println(sig)
+		closeListeners(listeners)
+		done <- true
+	}()
 
-	if _, err := c.Write([]byte(string("ok"))); err != nil {
-		fmt.Printf("couldn't write into the conn: %+v\n", err)
-	}
-
-	if err := c.Close(); err != nil {
-		fmt.Printf("couldn't close the conn: %+v\n", err)
-		return
-	}
+	fmt.Println("awaiting signal (e.g ctrl-c)")
+	<-done
+	fmt.Println("exiting")
 }
