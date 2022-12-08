@@ -1,6 +1,6 @@
-# acceptor
+# acceptor-http
 
-portquiz-like smol tcp-server
+A golang http server that listens on multiple ports.
 
 Accepts connections on a set of specified ports - useful if you are behind a firewall and want to work out what is open without being rate limited by a service like http://portquiz.net/
 
