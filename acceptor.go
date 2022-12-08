@@ -23,7 +23,7 @@ func main() {
 	}
 
 	if tilPort > 65535 {
-		log.Panicf("From port must be between 1 and 65535")
+		log.Panicf("Until port must be between 1 and 65535")
 	}
 
 	log.Printf("spawning tcp servers in range from %d til %d", fromPort, tilPort)
