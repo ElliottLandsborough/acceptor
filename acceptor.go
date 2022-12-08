@@ -1,10 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strconv"
 )
 
@@ -22,35 +22,36 @@ func handleConnection(c net.Conn) {
 }
 
 func main() {
-	arguments := os.Args
-	if len(arguments) == 1 {
-		fmt.Println("Please provide a port range.")
-		return
+	fromPortFlag := flag.Int("from", 1024, "From port")
+	tilPortFlag := flag.Int("until", 2048, "Until port")
+	dieFlag := flag.Bool("die", true, "Die when port cannot be opened")
+	flag.Parse()
+
+	fromPort := *fromPortFlag
+	tilPort := *tilPortFlag
+	die := *dieFlag
+
+	if fromPort < 1 {
+		log.Panicf("From port must be between 1 and 65535")
 	}
 
-	fromPortStr := arguments[1]
-	tilPortStr := arguments[2]
-
-	fromPort, err := strconv.ParseInt(fromPortStr, 10, 17)
-	if err != nil {
-		log.Panicf("can't parse the from port: %+v", err)
+	if tilPort > 65535 {
+		log.Panicf("From port must be between 1 and 65535")
 	}
 
-	tilPort, err := strconv.ParseInt(tilPortStr, 10, 17)
-	if err != nil {
-		log.Panicf("can't parse the til port: %+v", err)
-	}
 	log.Printf("spawning tcp servers in range from %d til %d", fromPort, tilPort)
 
 	toListen := make([]net.Listener, tilPort-fromPort+1)
 
 	for i := 0; fromPort <= tilPort; i, fromPort = i+1, fromPort+1 {
-		addr := ":" + strconv.FormatInt(fromPort, 10)
+		addr := ":" + strconv.FormatInt(int64(fromPort), 10)
 		log.Printf("trying to bind %s", addr)
 		l, err := net.Listen("tcp", addr)
 		if err != nil {
 			log.Printf("can't create the {%d}th of port listener: %+v", i, err)
-			goto toDie
+			if die == true {
+				goto toDie
+			}
 		}
 
 		toListen[i] = l
