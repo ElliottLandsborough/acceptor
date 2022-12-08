@@ -18,3 +18,9 @@ go run acceptor.go -from=1 -until=1024
 ```bash
 go run acceptor.go -from=1 -until=65535 -die=false
 ```
+
+#### How to test with nmap
+
+```bash
+nmap -T4 127.0.0.1 -r -p1024-2048 -v
+```
